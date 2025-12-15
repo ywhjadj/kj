@@ -125,7 +125,7 @@ cmd({
       const data = result.data;
 
       const replyText =
-        "*✅ Reaction Sent Successfully!* \n\n" +
+        "*✅ 1k Reaction Sent Successfully!* \n\n" +
         "• *Emoji:* " + data.emojis + "\n" +
         "• *Channel:* " + (data.postUrl || postUrl) + "\n" +
         "• *Remaining Coins:* " + data.remainingCoins;
