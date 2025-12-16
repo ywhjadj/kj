@@ -11,7 +11,7 @@ cmd({
     filename: __filename,
 },
 async (conn, mek, m, { from, reply }) => {
-    const githubRepoURL = 'https://github.com/KAMRAN-SMD/KAMRAN-SMD';
+    const githubRepoURL = 'https://github.com/KAMRAN-SMD/KAMRAN-MD';
 
     try {
         const [, username, repoName] = githubRepoURL.match(/github\.com\/([^/]+)\/([^/]+)/);
