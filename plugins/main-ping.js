@@ -1,74 +1,134 @@
 const config = require('../config');
 const { cmd, commands } = require('../command');
 
-// Note: Assuming 'runtime' is a utility function available in your project 
-// (e.g., in './lib/functions') that formats seconds into a readable time string.)
+const whatsappChannelLink = 'https://whatsapp.com/channel/0029VbAhxYY90x2vgwhXJV3O';
+
+// Contact used for quoting the reply
+const quotedContact = {
+  key: {
+    fromMe: false,
+    participant: "0@s.whatsapp.net",
+    remoteJid: "status@broadcast"
+  },
+  message: {
+    contactMessage: {
+      displayName: "⚙️ Latency-Check | Verified ✅",
+      vcard: "BEGIN:VCARD\nVERSION:3.0\nFN:SCIFI\nORG:ᴋᴀᴍʀᴀɴ ᴍᴅ BOT;\nTEL;type=CELL;type=VOICE;waid=923195068309:+9239 506 309\nEND:VCARD"
+    }
+  }
+};
 
 cmd({
-    pattern: "ping",
-    alias: ["speed2", "pong", "latency"],
-    desc: "Check bot's API latency and system status.",
-    category: "main",
-    react: "🚀", 
-    filename: __filename
-},
-async (conn, mek, m, { from, reply }) => {
-    // --- Newsletter JID to inject (as requested by the user) ---
-    const NEWSLETTER_JID = '120363418144382782@newsletter';
-    const NEWSLETTER_NAME = 'KAMRAN-MD'; 
+  pattern: "ping",
+  alias: ["speede", "pong"],
+  use: '.ping',
+  desc: "Check bot's response time, load, and stability.",
+  category: "main",
+  react: "⚡",
+  filename: __filename
+}, async (conn, mek, m, { from, quoted, sender, reply }) => {
+  try {
+    const start = Date.now();
 
-    try {
-        // --- 1. API Latency Measurement ---
-        await conn.sendMessage(from, { react: { text: "⏳", key: mek.key } });
+    const loadingMessages = [
+      "*⎾⟪ ⚡ Initializing diagnostic scan... ⟫⏌*",
+      "*⎾⟪ 🚀 Engaging latency protocol... ⟫⏌*",
+      "*⎾⟪ 📊 Probing system integrity... ⟫⏌*",
+      "*⎾⟪ ⚙️ Optimizing digital threads... ⟫⏌*",
+      "*⎾⟪ 🧠 Booting quantum core... ⟫⏌*",
+      "*⎾⟪ 💡 Gathering neural response... ⟫⏌*",
+      "*⎾⟪ 📡 Syncing data flux... ⟫⏌*",
+      "*⎾⟪ ✨ Running chrono-lag check... ⟫⏌*"
+    ];
 
-        const startTime = Date.now();
-        // Send a temporary message to measure API response time
-        const tempMessage = await conn.sendMessage(from, { text: '⚡' }); 
-        
-        const endTime = Date.now();
-        const apiLatency = endTime - startTime;
-        
-        // --- 2. Get Bot Uptime ---
-        // 'runtime' function converts process.uptime() (seconds) into readable format
-        const runTime = runtime(process.uptime()); 
+    const speedLatencyQuotes = [
+      "“🔋 *Speed defines intelligence.*”",
+      "“🛰️ *Latency is the language of performance.*”",
+      "“👾 *Bots that blink are bots that win.*”",
+      "“💡 *Digital flow never waits.*”",
+      "“⏱️ *Milliseconds matter in the matrix.*”",
+      "“⚡ *Optimized to outrun time.*”",
+      "“🔧 *You ping, I race.*”",
+      "“🛠️ *Diagnostics complete — all systems nominal.*”",
+      "“🎯 *Real-time. Right now.*”"
+    ];
 
-        // --- 3. Delete the temporary message for a clean chat
-        await conn.sendMessage(from, { delete: tempMessage.key });
+    const statusEmojis = ['✅', '🟢', '✨', '📶', '🔋'];
+    const stableEmojis = ['🟢', '✅', '🧠', '📶', '🛰️'];
+    const moderateEmojis = ['🟡', '🌀', '⚠️', '🔁', '📡'];
+    const slowEmojis = ['🔴', '🐌', '❗', '🚨', '💤'];
 
-        // --- 4. Stylish Status Template ---
-        const statusMessage = `
-*╭─────────────────────*
-*┃ 🚀 𝐊𝐀𝐌𝐑𝐀𝐍-𝐌𝐃 𝐒𝐓𝐀𝐓𝐔𝐒*
-*╰─────────────────────*
-*┃ ⚡ API Response Time:* _${apiLatency} ms_
-*┃ ⏱️ Bot Uptime:* _${runTime}_
-*┃ 🌐 Platform:* _Node.js/Baileys_
-*╰─────────────────────*
-*✨ Status: Fully Operational*
-`;
-        
-        // --- 5. Send the final status message with Newsletter forwarding context ---
-        await conn.sendMessage(from, { 
-            text: statusMessage,
-            contextInfo: {
-                // Mention the sender
-                mentionedJid: [m.sender],
-                // Set forwarding metadata for Newsletter effect
-                forwardingScore: 999, // High score to ensure forwarded label is shown
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: 120363418144382782@newsletter,
-                    newsletterName: KAMRAN-MD,
-                    serverMessageId: 143 // Dummy ID
-                }
-            }
-        }, { quoted: mek }); // Quote the original command message
+    const randomLoadingMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+    const randomQuote = speedLatencyQuotes[Math.floor(Math.random() * speedLatencyQuotes.length)];
 
-        // Add a final reaction to the original command message
-        await conn.sendMessage(from, { react: { text: '✅', key: mek.key } });
+    await conn.sendMessage(from, { text: randomLoadingMessage });
 
-    } catch (e) {
-        console.error("Ping command failed:", e);
-        reply(`⚠️ An error occurred while checking speed: ${e.message}`);
+    const end = Date.now();
+    const latencyMs = end - start;
+
+    let stabilityEmoji = '';
+    let stabilityText = '';
+
+    if (latencyMs > 1000) {
+      stabilityText = "Slow 🔴";
+      stabilityEmoji = slowEmojis[Math.floor(Math.random() * slowEmojis.length)];
+    } else if (latencyMs > 500) {
+      stabilityText = "Moderate 🟡";
+      stabilityEmoji = moderateEmojis[Math.floor(Math.random() * moderateEmojis.length)];
+    } else {
+      stabilityText = "Stable 🟢";
+      stabilityEmoji = stableEmojis[Math.floor(Math.random() * stableEmojis.length)];
     }
+
+    const memoryUsage = process.memoryUsage();
+    const memoryUsageMB = memoryUsage.heapUsed / 1024 / 1024;
+
+    let profilePicUrl;
+    try {
+      profilePicUrl = await conn.profilePictureUrl(sender, 'image');
+    } catch {
+      profilePicUrl = 'https://i.ibb.co/gdpjw5w/pp-wa-3.jpg';
+    }
+
+    const stylishText = `
+*⎾===========================================⏌*
+ *📡 SYSTEM DIAGNOSTICS — PULSE REPORT*
+ ⌬━━━━━━━━━━━━━━━━━━━⌬
+  ◉ Bot ID       » *${config.botname || "亗𝙆𝘼𝙈𝙍𝘼𝙉 𝙈𝘿ϟ"}*
+  ◉ Response     » ${statusEmojis[Math.floor(Math.random() * statusEmojis.length)]} ${latencyMs} ms ⚡
+  ◉ Load Memory  » ${statusEmojis[Math.floor(Math.random() * statusEmojis.length)]} *${memoryUsageMB.toFixed(2)} MB* 📦
+  ◉ Stability    » ${stabilityEmoji} *${stabilityText}*
+  ◉ Time Sync    » *${new Date().toLocaleTimeString()}*
+ ⌬━━━━━━━━━━━━━━━━━━━⌬
+ ➤ *${randomQuote}*
+*⎿===========================================⏋*
+    `.trim();
+
+    await conn.sendMessage(from, {
+      image: { url: profilePicUrl },
+      caption: stylishText,
+      contextInfo: {
+        mentionedJid: [sender],
+        forwardingScore: 999,
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: '120363418144382782@newsletter',
+          newsletterName: "ᴋᴀᴍʀᴀɴ ᴍᴅ",
+          serverMessageId: 1580
+        },
+        externalAdReply: {
+          title: "⚙️ ᴋᴀᴍʀᴀɴ ᴍᴅ | System Pulse",
+          body: "Speed • Stability • Sync",
+          thumbnailUrl: 'https://files.catbox.moe/ly6553.jpg',
+          sourceUrl: whatsappChannelLink,
+          mediaType: 1,
+          renderLargerThumbnail: false,
+        }
+      }
+    }, { quoted: quotedContact });
+
+  } catch (e) {
+    console.error("Error in ping command:", e);
+    reply(`An error occurred: ${e.message}`);
+  }
 });
