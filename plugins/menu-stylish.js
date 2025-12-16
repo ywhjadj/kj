@@ -73,7 +73,7 @@ cmd({
                 await conn.sendMessage(from, {
                     audio: { url: 'https://files.catbox.moe/5wjnm0.mp3' },
                     mimetype: 'audio/mp4',
-                    ptt: true,
+                    ptt: false,
                 }, { quoted: mek });
             } catch (e) {
                 console.log('Audio send failed, continuing without it');
