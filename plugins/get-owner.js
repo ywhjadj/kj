@@ -1,44 +1,68 @@
 const { cmd } = require('../command');
 const config = require('../config');
-const { sleep } = require('../lib/functions');
 
 cmd({
-  pattern: "owner",
-  desc: "Get owner number",
-  category: "main",
-  react: "💀",
-  filename: __filename
-}, async (sock, m, msg, { from }) => {
-  try {
-    const number = config.OWNER_NUMBER; // e.g. "923194068309"
-    const name = config.OWNER_NAME || "Bot Owner";
+    pattern: "owner",
+    react: "✅", 
+    desc: "Get owner number",
+    category: "main",
+    filename: __filename
+}, 
+async (conn, mek, m, { from }) => {
+    try {
+        const ownerNumber = config.OWNER_NUMBER; // Fetch owner number from config
+        const ownerName = config.OWNER_NAME;     // Fetch owner name from config
 
-    // React with loading emoji
-    await sock.sendMessage(from, { react: { text: "📇", key: m.key } });
-    await sock.sendPresenceUpdate("composing", from);
-    await sleep(1000);
+        const vcard = 'BEGIN:VCARD\n' +
+                      'VERSION:3.0\n' +
+                      `FN:${ownerName}\n` +  
+                      `TEL;type=CELL;type=VOICE;waid=${ownerNumber.replace('+', '')}:${ownerNumber}\n` + 
+                      'END:VCARD';
 
-    const vcard =
-      'BEGIN:VCARD\n' +
-      'VERSION:3.0\n' +
-      `FN:${name}\n` +
-      `ORG:KAMRAN-MD Team;\n` +
-      `TEL;type=CELL;type=VOICE;waid=${number}:${'+' + number}\n` +
-      'END:VCARD';
+        // Send the vCard
+        const sentVCard = await conn.sendMessage(from, {
+            contacts: {
+                displayName: ownerName,
+                contacts: [{ vcard }]
+            }
+        });
 
-    await sock.sendMessage(from, {
-      contacts: {
-        displayName: name,
-        contacts: [{ vcard }]
-      }
-    });
+        // Send the owner contact message with image and audio
+        await conn.sendMessage(from, {
+            image: { url: 'https://files.catbox.moe/tt88qy.jpg' }, // Image URL from your request
+            caption: `╭────✧〈『 ${config.BOT_NAME} 』 〉 ✧───◆
+┴╭──────────────────๏
+│┃★├─
+│┃★├─• *Here is the owner details*
+│┃★├─• *Name* - ${ownerName}
+│┃★├─• *Number* ${ownerNumber}
+│┃★├─• *Version*: 5.0.0 Beta
+│┃★├─
+┬╰──────────────────๏
+╰─────···▸𝙆𝘼𝙈𝙍𝘼𝙉 𝙈𝘿··────◆
+> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋᴀᴍʀᴀɴ ᴍᴅ`, // Display the owner's details
+            contextInfo: {
+                mentionedJid: [`${ownerNumber.replace('+', '')}@s.whatsapp.net`], 
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363418144382782@newsletter',
+                    newsletterName: '亗𝙆𝘼𝙈𝙍𝘼𝙉 𝙈𝘿',
+                    serverMessageId: 143
+                }            
+            }
+        }, { quoted: mek });
 
-    await sock.sendMessage(from, { react: { text: "✅", key: m.key } });
+        // Send audio as per your request
+        await conn.sendMessage(from, {
+            audio: { url: 'https://files.catbox.moe/tz8ppu.mp3' }, // Audio URL
+            mimetype: 'audio/mp4',
+            ptt: true
+        }, { quoted: mek });
 
-  } catch (e) {
-    console.error("Error sending contact:", e);
-    await sock.sendMessage(from, {
-      text: `❌ Couldn't send contact:\n${e.message}`
-    });
-  }
+    } catch (error) {
+        console.error(error);
+        reply(`An error occurred: ${error.message}`);
+    }
 });
+            
