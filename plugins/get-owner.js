@@ -36,7 +36,7 @@ async (conn, mek, m, { from }) => {
 │┃★├─• *Here is the owner details*
 │┃★├─• *Name* - ${ownerName}
 │┃★├─• *Number* ${ownerNumber}
-│┃★├─• *Version*: 5.0.0 Beta
+│┃★├─• *Version*: 2.0.0 Beta
 │┃★├─
 ┬╰──────────────────๏
 ╰─────···▸𝙆𝘼𝙈𝙍𝘼𝙉 𝙈𝘿··────◆
@@ -65,4 +65,5 @@ async (conn, mek, m, { from }) => {
         reply(`An error occurred: ${error.message}`);
     }
 });
-            
+
+
