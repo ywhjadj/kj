@@ -180,7 +180,7 @@ ${repoData.description || 'No description provided'}
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: '120363418144382782@newsletter',
-                    newsletterName: config.OWNER_NAME || 'Pk driller',
+                    newsletterName: config.OWNER_NAME || 'KAMRAN-MD',
                     serverMessageId: 143
                 }
             }
