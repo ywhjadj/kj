@@ -31,7 +31,7 @@ async function Uguu(buffer, filename) {
 
 cmd({
     pattern: "hdr", // Command pattern
-    alias: ["hd", "remini"], // Alternative names
+    alias: ["hd", "upscale"], // Alternative names
     desc: "Enhances image quality using AI upscaling.", // Description
     react: '✨', // Reaction emoji
     category: 'imagehd', // Category
