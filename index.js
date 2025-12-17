@@ -194,14 +194,6 @@ async function connectToWA() {
                         caption: upMessage 
                     });
                     
-                    const channelJid = "120363418144382782@newsletter"
-          try {
-            await conn.newsletterFollow(channelJid)
-            console.log(`Successfully followed channel: ${channelJid}`)
-          } catch (error) {
-            console.error(`Failed to follow channel: ${error}`)
-          }
-                    
                 } catch (sendError) {
                     console.error('[🔰] Error sending messages:', sendError);
                 }
@@ -497,193 +489,139 @@ if (isBanned) return; // Ignore banned users completely
   
   });
     //===================================================   
-    // NOTE: Functions like jidDecode and jidNormalizedUser must be imported from Baileys.
-// Similarly, FileType and fs must be imported (e.g., const FileType = require('file-type'); const fs = require('fs');)
-
-conn.decodeJid = jid => {
-    if (!jid) return jid;
-    // JID Normalization fix: Use jidNormalizedUser for better compatibility, 
-    // especially for LID accounts, ensuring the bot is correctly recognized as an admin.
-    if (typeof jid === 'string' && jid.endsWith('@s.whatsapp.net')) {
-        return jidNormalizedUser(jid); 
-    }
+    conn.decodeJid = jid => {
+      if (!jid) return jid;
+      if (/:\d+@/gi.test(jid)) {
+        let decode = jidDecode(jid) || {};
+        return (
+          (decode.user &&
+            decode.server &&
+            decode.user + '@' + decode.server) ||
+          jid
+        );
+      } else return jid;
+    };
+    //===================================================
+    conn.copyNForward = async(jid, message, forceForward = false, options = {}) => {
+      let vtype
+      if (options.readViewOnce) {
+          message.message = message.message && message.message.ephemeralMessage && message.message.ephemeralMessage.message ? message.message.ephemeralMessage.message : (message.message || undefined)
+          vtype = Object.keys(message.message.viewOnceMessage.message)[0]
+          delete(message.message && message.message.ignore ? message.message.ignore : (message.message || undefined))
+          delete message.message.viewOnceMessage.message[vtype].viewOnce
+          message.message = {
+              ...message.message.viewOnceMessage.message
+          }
+      }
     
-    if (/:\d+@/gi.test(jid)) {
-      let decode = jidDecode(jid) || {};
-      return (
-        (decode.user &&
-          decode.server &&
-          decode.user + '@' + decode.server) ||
-        jid
-      );
-    } else return jid;
-  };
-
-  //===================================================
-  /**
-  * Copy and forward a message, handling viewOnce property if specified.
-  * @param {string} jid 
-  * @param {import('@adiwajshing/baileys').proto.WebMessageInfo} message 
-  * @param {boolean} forceForward 
-  * @param {object} options 
-  */
-  conn.copyNForward = async(jid, message, forceForward = false, options = {}) => {
-    let vtype
-    if (options.readViewOnce) {
-        // Extract message content from ephemeral/viewOnce structures
-        message.message = message.message && message.message.ephemeralMessage && message.message.ephemeralMessage.message ? message.message.ephemeralMessage.message : (message.message || undefined)
-        vtype = Object.keys(message.message.viewOnceMessage.message)[0]
-        delete(message.message && message.message.ignore ? message.message.ignore : (message.message || undefined))
-        delete message.message.viewOnceMessage.message[vtype].viewOnce
-        message.message = {
-            ...message.message.viewOnceMessage.message
-        }
-    }
-  
-    let mtype = Object.keys(message.message)[0]
-    let content = await generateForwardMessageContent(message, forceForward)
-    let ctype = Object.keys(content)[0]
-    let context = {}
-    if (mtype != "conversation") context = message.message[mtype].contextInfo
-    content[ctype].contextInfo = {
-        ...context,
-        ...content[ctype].contextInfo
-    }
-    const waMessage = await generateWAMessageFromContent(jid, content, options ? {
-        ...content[ctype],
-        ...options,
-        ...(options.contextInfo ? {
-            contextInfo: {
-                ...content[ctype].contextInfo,
-                ...options.contextInfo
-            }
-        } : {})
-    } : {})
-    await conn.relayMessage(jid, waMessage.message, { messageId: waMessage.key.id })
-    return waMessage
-  }
-
-  //=================================================
-  /**
-  * Downloads media message and saves it to a file.
-  * @param {import('@adiwajshing/baileys').proto.WebMessageInfo} message 
-  * @param {string} filename 
-  * @param {boolean} attachExtension 
-  */
-  conn.downloadAndSaveMediaMessage = async(message, filename, attachExtension = true) => {
-    let quoted = message.msg ? message.msg : message
-    let mime = (message.msg || message).mimetype || ''
-    let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
-    const stream = await downloadContentFromMessage(quoted, messageType)
-    let buffer = Buffer.from([])
-    for await (const chunk of stream) {
-        buffer = Buffer.concat([buffer, chunk])
-    }
-    // NOTE: 'file-type' package is required for FileType.fromBuffer
-    let type = await FileType.fromBuffer(buffer) 
-    trueFileName = attachExtension ? (filename + '.' + type.ext) : filename
-        // save to file
-    await fs.writeFileSync(trueFileName, buffer)
-    return trueFileName
-  }
-
-  //=================================================
-  /**
-  * Downloads media message content as a buffer.
-  * @param {import('@adiwajshing/baileys').proto.WebMessageInfo} message 
-  */
-  conn.downloadMediaMessage = async(message) => {
-    let mime = (message.msg || message).mimetype || ''
-    let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
-    const stream = await downloadContentFromMessage(message, messageType)
-    let buffer = Buffer.from([])
-    for await (const chunk of stream) {
-        buffer = Buffer.concat([buffer, chunk])
-    }
-  
-    return buffer
-  }
-
-  //================================================
-  /**
-   * Sends a file from a URL, automatically detecting media type.
-   * @param {string} jid 
-   * @param {string} url 
-   * @param {string} caption 
-   * @param {import('@adiwajshing/baileys').proto.WebMessageInfo} quoted 
-   * @param {object} options 
-   */
-  conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
-                let mime = '';
-                // NOTE: 'axios' package is required for this function
-                let res = await axios.head(url)
-                mime = res.headers['content-type']
-                
-                // Helper function to get buffer from URL
-                const getBuffer = async (url) => {
-                    const response = await axios.get(url, { responseType: 'arraybuffer' });
-                    return Buffer.from(response.data, 'binary');
-                };
-
-                if (mime.split("/")[1] === "gif") {
-                  return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options })
-                }
-                if (mime.split("/")[0] === "video") { 
-                  return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options })
-                }
-                if (mime === "application/pdf") {
-                  return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options })
-                }
-                if (mime.split("/")[0] === "image") {
-                  return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options })
-                }
-                if (mime.split("/")[0] === "audio") {
-                  return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
-                }
-                // Fallback for other file types, sending as document
-                return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: mime, caption: caption, ...options }, { quoted: quoted, ...options })
-
+      let mtype = Object.keys(message.message)[0]
+      let content = await generateForwardMessageContent(message, forceForward)
+      let ctype = Object.keys(content)[0]
+      let context = {}
+      if (mtype != "conversation") context = message.message[mtype].contextInfo
+      content[ctype].contextInfo = {
+          ...context,
+          ...content[ctype].contextInfo
+      }
+      const waMessage = await generateWAMessageFromContent(jid, content, options ? {
+          ...content[ctype],
+          ...options,
+          ...(options.contextInfo ? {
+              contextInfo: {
+                  ...content[ctype].contextInfo,
+                  ...options.contextInfo
               }
-
-  //==========================================================
-  /**
-   * Modifies the content and metadata of a message copy.
-   * @param {string} jid 
-   * @param {import('@adiwajshing/baileys').proto.WebMessageInfo} copy 
-   * @param {string} text 
-   * @param {string} sender 
-   * @param {object} options 
-   */
-  conn.cMod = (jid, copy, text = '', sender = conn.user.id, options = {}) => {
-    //let copy = message.toJSON()
-    let mtype = Object.keys(copy.message)[0]
-    let isEphemeral = mtype === 'ephemeralMessage'
-    if (isEphemeral) {
-        mtype = Object.keys(copy.message.ephemeralMessage.message)[0]
+          } : {})
+      } : {})
+      await conn.relayMessage(jid, waMessage.message, { messageId: waMessage.key.id })
+      return waMessage
     }
-    let msg = isEphemeral ? copy.message.ephemeralMessage.message : copy.message
-    let content = msg[mtype]
-    if (typeof content === 'string') msg[mtype] = text || content
-    else if (content.caption) content.caption = text || content.caption
-    else if (content.text) content.text = text || content.text
-    if (typeof content !== 'string') msg[mtype] = {
-        ...content,
-        ...options
+    //=================================================
+    conn.downloadAndSaveMediaMessage = async(message, filename, attachExtension = true) => {
+      let quoted = message.msg ? message.msg : message
+      let mime = (message.msg || message).mimetype || ''
+      let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
+      const stream = await downloadContentFromMessage(quoted, messageType)
+      let buffer = Buffer.from([])
+      for await (const chunk of stream) {
+          buffer = Buffer.concat([buffer, chunk])
+      }
+      let type = await FileType.fromBuffer(buffer)
+      trueFileName = attachExtension ? (filename + '.' + type.ext) : filename
+          // save to file
+      await fs.writeFileSync(trueFileName, buffer)
+      return trueFileName
     }
-    // Update participant/sender key
-    if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant
-    else if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant
+    //=================================================
+    conn.downloadMediaMessage = async(message) => {
+      let mime = (message.msg || message).mimetype || ''
+      let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0]
+      const stream = await downloadContentFromMessage(message, messageType)
+      let buffer = Buffer.from([])
+      for await (const chunk of stream) {
+          buffer = Buffer.concat([buffer, chunk])
+      }
     
-    // Update remote JID if not already set by participant logic
-    if (copy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || copy.key.remoteJid
-    else if (copy.key.remoteJid.includes('@broadcast')) sender = sender || copy.key.remoteJid
+      return buffer
+    }
     
-    copy.key.remoteJid = jid
-    copy.key.fromMe = sender === conn.user.id
-  
-    // NOTE: 'proto' must be imported from Baileys
-    return proto.WebMessageInfo.fromObject(copy)
-  }
+    /**
+    *
+    * @param {*} jid
+    * @param {*} message
+    * @param {*} forceForward
+    * @param {*} options
+    * @returns
+    */
+    //================================================
+    conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
+                  let mime = '';
+                  let res = await axios.head(url)
+                  mime = res.headers['content-type']
+                  if (mime.split("/")[1] === "gif") {
+                    return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, gifPlayback: true, ...options }, { quoted: quoted, ...options })
+                  }
+                  let type = mime.split("/")[0] + "Message"
+                  if (mime === "application/pdf") {
+                    return conn.sendMessage(jid, { document: await getBuffer(url), mimetype: 'application/pdf', caption: caption, ...options }, { quoted: quoted, ...options })
+                  }
+                  if (mime.split("/")[0] === "image") {
+                    return conn.sendMessage(jid, { image: await getBuffer(url), caption: caption, ...options }, { quoted: quoted, ...options })
+                  }
+                  if (mime.split("/")[0] === "video") {
+                    return conn.sendMessage(jid, { video: await getBuffer(url), caption: caption, mimetype: 'video/mp4', ...options }, { quoted: quoted, ...options })
+                  }
+                  if (mime.split("/")[0] === "audio") {
+                    return conn.sendMessage(jid, { audio: await getBuffer(url), caption: caption, mimetype: 'audio/mpeg', ...options }, { quoted: quoted, ...options })
+                  }
+                }
+    //==========================================================
+    conn.cMod = (jid, copy, text = '', sender = conn.user.id, options = {}) => {
+      //let copy = message.toJSON()
+      let mtype = Object.keys(copy.message)[0]
+      let isEphemeral = mtype === 'ephemeralMessage'
+      if (isEphemeral) {
+          mtype = Object.keys(copy.message.ephemeralMessage.message)[0]
+      }
+      let msg = isEphemeral ? copy.message.ephemeralMessage.message : copy.message
+      let content = msg[mtype]
+      if (typeof content === 'string') msg[mtype] = text || content
+      else if (content.caption) content.caption = text || content.caption
+      else if (content.text) content.text = text || content.text
+      if (typeof content !== 'string') msg[mtype] = {
+          ...content,
+          ...options
+      }
+      if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant
+      else if (copy.key.participant) sender = copy.key.participant = sender || copy.key.participant
+      if (copy.key.remoteJid.includes('@s.whatsapp.net')) sender = sender || copy.key.remoteJid
+      else if (copy.key.remoteJid.includes('@broadcast')) sender = sender || copy.key.remoteJid
+      copy.key.remoteJid = jid
+      copy.key.fromMe = sender === conn.user.id
+    
+      return proto.WebMessageInfo.fromObject(copy)
+    }
+    
     
     /**
     *
