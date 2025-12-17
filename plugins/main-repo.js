@@ -188,7 +188,7 @@ ${repoData.description || 'No description provided'}
 
         // Send audio
         await conn.sendMessage(from, {
-            audio: { url: 'https://files.catbox.moe/bo72gy.mp3' },
+            audio: { url: 'https://files.catbox.moe/etattc.mp3' },
             mimetype: 'audio/mp4',
             ptt: false,
             contextInfo: { 
