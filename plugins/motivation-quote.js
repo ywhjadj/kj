@@ -1,117 +1,85 @@
-// plugins/fakestory.js
-const axios = require("axios");
-const { cmd } = require("../command");
-const { getBuffer } = require("../lib/functions");
-const FormData = require("form-data");
+// plugins/rank.js
 const fs = require("fs");
+const path = require("path");
+const { cmd } = require("../command"); // your command handler
+const rankFile = path.join(__dirname, "../lib/rank.json");
 
-cmd(
-  {
-    pattern: "fakestory",
-    alias: ["fakestoryig", "igstory"],
-    desc: "Create a fake Instagram story with username and caption",
-    category: "maker",
-    filename: __filename,
-  },
-  async (malvin, mek, m, { args, reply, q }) => {
-    try {
-      if (!args[0])
-        return reply(
-          `🌸 *Wrong format!*\nUse: *.fakestory username|caption*\n\n💡 Example: *.fakestory NovaCore|Living my best life 💫*`
-        );
+let rankDB = {};
+if (fs.existsSync(rankFile)) {
+  rankDB = JSON.parse(fs.readFileSync(rankFile));
+}
 
-      // Get quoted image or self image
-      const quoted = m.quoted ? m.quoted : mek;
-      const mime =
-        (quoted.message?.imageMessage?.mimetype ||
-          quoted.msg?.mimetype ||
-          "") || "";
-      if (!/image\/(jpe?g|png)/.test(mime)) {
-        return reply(
-          "🖼️ *Please reply to or send an image (JPG/PNG) with this command!*"
-        );
-      }
+function saveRank() {
+  fs.writeFileSync(rankFile, JSON.stringify(rankDB, null, 2));
+}
 
-      // React ⏳
-      await malvin.sendMessage(m.chat, { react: { text: "⏳", key: mek.key } });
-
-      const [username, caption] = args.join(" ").split("|");
-      if (!username || !caption)
-        return reply(
-          `❌ *Invalid format!*\nUse: *.fakestory username|caption*\n\nExample: *.fakestory NovaCore|Living my best life 💫*`
-        );
-
-      // Download image buffer
-      const mediaMsg = quoted.message.imageMessage || quoted.msg;
-      const mediaBuffer = await downloadMedia(malvin, mediaMsg);
-      if (!mediaBuffer) return reply("🍂 *Failed to download image!*");
-
-      // Upload to catbox
-      const uploadedUrl = await uploadToCatbox(mediaBuffer);
-      if (!uploadedUrl) return reply("❌ *Failed to upload image, try again.*");
-
-      // Request FakeStory API
-      const apiUrl = `https://api.zenzxz.my.id/maker/fakestory?username=${encodeURIComponent(
-        username
-      )}&caption=${encodeURIComponent(caption)}&ppurl=${encodeURIComponent(
-        uploadedUrl
-      )}`;
-
-      const response = await axios.get(apiUrl, {
-        responseType: "arraybuffer",
-        timeout: 25000,
-      });
-
-      if (!response.data) return reply("❌ *Failed to fetch FakeStory image.*");
-
-      const resultBuffer = Buffer.from(response.data);
-
-      // Send the generated story
-      await malvin.sendMessage(
-        m.chat,
-        {
-          image: resultBuffer,
-          caption:
-            `✨ *Fake Instagram Story Created!*\n\n👤 *Username:* ${username}\n📝 *Caption:* ${caption}\n\n🧠 Powered by *Dr Kamran*`,
-        },
-        { quoted: mek }
-      );
-    } catch (err) {
-      console.error("FakeStory Error:", err);
-      reply(`⚠️ *Error:* ${err.message || "Something went wrong."}`);
-    } finally {
-      await malvin.sendMessage(m.chat, { react: { text: "", key: mek.key } });
-    }
+// Get or create user rank
+function getUserRank(userId) {
+  if (!rankDB[userId]) {
+    rankDB[userId] = { xp: 0, level: 1 };
+    saveRank();
   }
-);
+  return rankDB[userId];
+}
 
-// ====== Helper functions ======
+// Add XP and handle level up
+function addXP(userId, amount, reply) {
+  let user = getUserRank(userId);
+  user.xp += amount;
+  let leveledUp = false;
 
-async function downloadMedia(malvin, msg) {
-  try {
-    const buffer = await malvin.downloadMediaMessage(msg);
-    return buffer;
-  } catch {
-    return null;
+  while (user.xp >= 200 * user.level) {
+    user.xp -= 200 * user.level;
+    user.level++;
+    leveledUp = true;
+  }
+
+  saveRank();
+
+  if (leveledUp && reply) {
+    reply(`🎉 @${userId.split("@")[0]} leveled up to Level ${user.level}!`, { mentions: [userId] });
   }
 }
 
-async function uploadToCatbox(buffer) {
-  try {
-    const form = new FormData();
-    form.append("reqtype", "fileupload");
-    form.append("fileToUpload", buffer, { filename: "upload.jpg" });
+// Display user rank
+function displayRank(userId) {
+  let user = getUserRank(userId);
+  return `🎖 Level: ${user.level}\n💫 XP: ${user.xp}/${user.level*200}`;
+}
 
-    const res = await axios.post("https://catbox.moe/user/api.php", form, {
-      headers: form.getHeaders(),
-      timeout: 20000,
-    });
+// Get leaderboard
+function getLeaderboard(limit = 10) {
+  let users = Object.keys(rankDB).map(u => ({ user: u, level: rankDB[u].level, xp: rankDB[u].xp }));
+  users.sort((a,b) => b.level - a.level || b.xp - a.xp);
+  return users.slice(0, limit);
+}
 
-    return res.data.includes("https")
-      ? res.data.trim()
-      : null;
-  } catch {
-    return null;
-  }
-          }
-          
+// ---------------- COMMANDS ---------------- //
+
+// .rank command
+cmd({
+  pattern: "rank",
+  desc: "Check your rank and XP",
+  category: "rank",
+  filename: __filename
+}, async (malvin, mek, m, { sender, reply }) => {
+  reply(displayRank(sender));
+});
+
+// .leaderboard command
+cmd({
+  pattern: "leaderboard",
+  alias: ["top"],
+  desc: "Show top ranked users",
+  category: "rank",
+  filename: __filename
+}, async (malvin, mek, m, { reply }) => {
+  let top = getLeaderboard(10);
+  let list = "🏆 *Top 10 Users* 🏆\n\n";
+  top.forEach((u,i) => {
+    list += `${i+1}. @${u.user.split("@")[0]} - Level ${u.level} (${u.xp} XP)\n`;
+  });
+  reply(list, { mentions: top.map(u => u.user) });
+});
+
+module.exports = { addXP, getUserRank, displayRank, getLeaderboard };
