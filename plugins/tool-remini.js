@@ -1,7 +1,9 @@
-const axios = require('axios');
+const axios = require("axios");
 const FormData = require('form-data');
-const { fromBuffer } = require('file-type');
-const { cmd } = require("../command"); 
+const fs = require('fs');
+const os = require('os');
+const path = require("path");
+const { cmd } = require("../command");
 
 /**
  * Uploads a buffer to uguu.se to get a public URL.
@@ -118,4 +120,4 @@ Example: \`${usedPrefix}${command} 8\``);
     reply(errorMsg);
   }
 });
-    
+  
