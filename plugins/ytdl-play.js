@@ -2,229 +2,108 @@ const { cmd } = require("../command");
 const yts = require("yt-search");
 const axios = require("axios");
 
-// NOTE: This code uses two endpoints: /download/ytdl (for base data/video) and /download/audio (for audio link, as requested by user).
-
-const cache = new Map(); // Caching search results
+const cache = new Map();
 
 // --- Helper Functions ---
-
 function normalizeYouTubeUrl(url) {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/.*[?&]v=)([a-zA-Z0-9_-]{11})/);
-  return match ? `https://youtube.com/watch?v=${match[1]}` : null;
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/.*[?&]v=)([a-zA-Z0-9_-]{11})/);
+    return match ? `https://youtube.com/watch?v=${match[1]}` : null;
 }
 
 function getVideoId(url) {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/.*[?&]v=)([a-zA-Z0-9_-]{11})/);
-  return match ? match[1] : null;
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/.*[?&]v=)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
 }
 
-// Function to fetch base data (title, thumbnail, and internal ytdl links)
-async function fetchBaseData(url, retries = 2) {
-  const cacheKey = `baseData:${getVideoId(url)}`;
-  if (cache.has(cacheKey)) {
-    console.log(`Using cached data for: ${url}`);
-    return cache.get(cacheKey);
-  }
-
-  try {
-    const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(url)}`;
-    console.log(`Fetching Base Data from API: ${apiUrl}`);
-    
-    const response = await axios.get(apiUrl, { timeout: 15000 });
-    const data = response.data;
-
-    if (data.status === true && data.result) {
-      const downloadData = data.result;
-      
-      const result = {
-        download_url_mp4: downloadData.mp4, // Video link from /ytdl
-        download_url_mp3: downloadData.mp3, // Audio link from /ytdl (fallback)
-        title: downloadData.title || "",
-        thumbnail: data.info?.image || `https://i.ytimg.com/vi/${getVideoId(url)}/hqdefault.jpg`,
-      };
-      
-      cache.set(cacheKey, result);
-      setTimeout(() => cache.delete(cacheKey), 3600000); // Cache for 1 hour
-      return result;
+async function fetchBaseData(url) {
+    try {
+        const apiUrl = `https://jawad-tech.vercel.app/download/ytdl?url=${encodeURIComponent(url)}`;
+        const response = await axios.get(apiUrl, { timeout: 20000 });
+        if (response.data && response.data.status) return response.data.result;
+        return null;
+    } catch (e) {
+        return null;
     }
-    
-    throw new Error("API status failure or result missing.");
-  } catch (error) {
-    console.error(`Base Data fetch failed: ${error.message}`);
-    if (retries > 0) {
-      console.log(`Retrying API fetch... (${retries} left)`);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      return fetchBaseData(url, retries - 1);
-    }
-    return null;
-  }
-}
-
-async function searchYouTube(query, maxResults = 1) {
-  const cacheKey = `search:${query}`;
-  if (cache.has(cacheKey)) {
-    return cache.get(cacheKey);
-  }
-
-  try {
-    const searchResults = await yts({ query, pages: 1 });
-    const videos = searchResults.videos.slice(0, maxResults);
-    cache.set(cacheKey, videos);
-    setTimeout(() => cache.delete(cacheKey), 1800000); 
-    return videos;
-  } catch (error) {
-    console.error(`Search error: ${error.message}`);
-    return [];
-  }
 }
 
 // --- MAIN COMMAND ---
-cmd(
-  {
+cmd({
     pattern: "play",
     alias: ["yta", "dlsong", "ytmp4"],
     react: "🎬",
-    desc: "Download video/audio from YouTube with simple selection (1=MP4, 2=MP3).",
+    desc: "Download video/audio from YouTube.",
     category: "ice Pakistan",
     filename: __filename,
-  },
-  async (robin, mek, m, { from, q, reply }) => {
+},
+async (robin, mek, m, { from, q, reply }) => {
     try {
-      if (!q) return reply("Kripya video ka naam ya URL dein aur phir menu se select karein."); 
+        if (!q) return reply("Kripya song ka naam ya link dein.");
 
-      await robin.sendMessage(from, { react: { text: "🔍", key: mek.key } });
+        await robin.sendMessage(from, { react: { text: "🔍", key: mek.key } });
 
-      const url = normalizeYouTubeUrl(q);
-      let ytdata;
+        const search = await yts(q);
+        const data = search.videos[0];
+        if (!data) return reply("❌ Result nahi mila.");
 
-      if (url) {
-        const searchResults = await searchYouTube(url);
-        if (!searchResults.length) return reply("❌ Video not found!");
-        ytdata = searchResults[0];
-      } else {
-        const searchResults = await searchYouTube(q);
-        if (!searchResults.length) return reply("❌ No videos found matching your query!");
-        ytdata = searchResults[0];
-      }
+        let desc = `🎬 *KAMRAN-MD DOWNLOADER* 🎬\n\n` +
+            `📌 *Title:* ${data.title}\n` +
+            `⏱️ *Duration:* ${data.timestamp}\n` +
+            `🔗 *Link:* ${data.url}\n\n` +
+            `🔢 *Reply karein:* \n1 - Video (MP4) 🎥\n2 - Audio (MP3) 🎶\n\n` +
+            `> © Powered by Kamran-MD`;
 
-      // Format the descriptive text for the simplified menu
-      let desc = `
- 🎬 亗𝙆𝘼𝙈𝙍𝘼𝙉 𝙈𝘿 𝘿𝙊𝙒𝙉𝙇𝙊𝘼𝘿 🎬
+        const sentMsg = await robin.sendMessage(from, { image: { url: data.thumbnail }, caption: desc }, { quoted: mek });
 
-📌 *Title:* ${ytdata.title}
-🎬 *Channel:* ${ytdata.author.name}
-👁️ *Views:* ${ytdata.views}
-⏱️ *Duration:* ${ytdata.timestamp}
-🕒 *Uploaded:* ${ytdata.ago}
-🔗 *Link:* ${ytdata.url}
-
-🔢 *Reply with a number to select format:*
-1 - MP4 (Video) 🎥
-2 - MP3 (Audio) 🎶
-   
-> © ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴋᴀᴍʀᴀɴ ᴍᴅ`; 
-
-      // Send the menu message
-      const vv = await robin.sendMessage(
-        from,
-        { image: { url: ytdata.thumbnail }, caption: desc },
-        { quoted: mek }
-      );
-
-      await robin.sendMessage(from, { react: { text: "✅", key: mek.key } });
-
-      // --- LISTEN FOR USER'S REPLY ---
-      robin.ev.on("messages.upsert", async (msgUpdate) => {
-        const msg = msgUpdate.messages[0];
-        
-        // Ensure the message is a reply to the menu we just sent
-        if (
-          !msg.message || 
-          !msg.message.extendedTextMessage || 
-          msg.message.extendedTextMessage.contextInfo.stanzaId !== vv.key.id
-        ) return;
-
-        const selectedOption = msg.message.extendedTextMessage.text.trim();
-        
-        try {
+        // --- SMART LISTENER ---
+        const handler = async (update) => {
+            const msg = update.messages[0];
+            if (!msg.message || !msg.message.extendedTextMessage) return;
             
-          const validOptions = ["1", "2"]; // Only 1 or 2 are valid
-          if (!validOptions.includes(selectedOption)) {
-            await robin.sendMessage(from, { react: { text: "❓", key: msg.key } });
-            return reply("Kripya sahi option (1 ya 2) se reply karein."); 
-          }
+            const text = msg.message.extendedTextMessage.text.trim();
+            const isReplyToBot = msg.message.extendedTextMessage.contextInfo.stanzaId === sentMsg.key.id;
 
-          await robin.sendMessage(from, { react: { text: "⏳", key: msg.key } });
+            if (isReplyToBot && (text === "1" || text === "2")) {
+                // Listener ko foran band karein taake memory leak na ho
+                robin.ev.off("messages.upsert", handler);
 
-          // Determine media type based on selection
-          const isAudio = selectedOption === "2";
+                await robin.sendMessage(from, { react: { text: "⏳", key: msg.key } });
+                const isAudio = text === "2";
+                
+                // API Fetching
+                const apiData = await fetchBaseData(data.url);
+                let downloadUrl = isAudio ? apiData?.mp3 : apiData?.mp4;
 
-          // Fetch the download URLs using the base data function
-          const data = await fetchBaseData(ytdata.url);
-          
-          let downloadUrl;
-          let formatText;
+                if (!downloadUrl) {
+                    // Fallback for Audio
+                    if (isAudio) {
+                        const audioRes = await axios.get(`https://jawad-tech.vercel.app/download/audio?url=${encodeURIComponent(data.url)}`).catch(() => null);
+                        downloadUrl = audioRes?.data?.result;
+                    }
+                }
 
-          if (isAudio) {
-              formatText = "MP3 Audio";
-              // --- Audio Logic: Use the user's requested /download/audio endpoint ---
-              const audioApiUrl = `https://jawad-tech.vercel.app/download/audio?url=${encodeURIComponent(ytdata.url)}`;
-              
-              try {
-                  const audioRes = await axios.get(audioApiUrl, { timeout: 15000 });
-                  if (audioRes.data.status === true && audioRes.data.result) {
-                      downloadUrl = audioRes.data.result;
-                  } else {
-                      throw new Error("Dedicated Audio API failed to return a direct link.");
-                  }
-              } catch (audioApiError) {
-                  console.error("Dedicated Audio API Failed. Falling back to /ytdl link:", audioApiError.message);
-                  // Fallback: If dedicated API fails, use the link fetched by /ytdl
-                  downloadUrl = data?.download_url_mp3; 
-              }
-          } else {
-              formatText = "MP4 Video";
-              // Video link always comes from the /ytdl fetch done in fetchBaseData
-              downloadUrl = data?.download_url_mp4;
-          }
+                if (!downloadUrl) return reply("❌ Link generate nahi ho saka. Dobara koshish karein.");
 
-          if (!data || !downloadUrl) {
-            await robin.sendMessage(from, { react: { text: "❌", key: msg.key } });
-            return reply("❌ Download link nahi mil paaya! Kripya dobara koshish karein."); 
-          }
+                await robin.sendMessage(from, {
+                    [isAudio ? "audio" : "video"]: { url: downloadUrl },
+                    mimetype: isAudio ? "audio/mpeg" : "video/mp4",
+                    fileName: `${data.title}.${isAudio ? "mp3" : "mp4"}`,
+                    ptt: false
+                }, { quoted: msg });
 
-          const fileExtension = isAudio ? 'mp3' : 'mp4';
-          const mimeType = isAudio ? 'audio/mpeg' : 'video/mp4';
-          const mediaKey = isAudio ? 'audio' : 'video';
-          
-          // Send the final media
-          await robin.sendMessage(
-            from,
-            {
-              [mediaKey]: { url: downloadUrl },
-              mimetype: mimeType,
-              // --- CRITICAL FIX: Explicitly setting ptt: false for audio to prevent corruption error ---
-              ptt: isAudio ? false : undefined, 
-              fileName: `${ytdata.title}_${formatText}.${fileExtension}`,
-              caption: `✅ *${ytdata.title}* Downloaded Successfully!\n*Format:* ${formatText}`,
-            },
-            { quoted: msg }
-          );
-          
-          // Final success reaction
-          await robin.sendMessage(from, { react: { text: "✅", key: msg.key } });
+                await robin.sendMessage(from, { react: { text: "✅", key: msg.key } });
+            }
+        };
 
-        } catch (error) {
-          console.error("Download error:", error);
-          await robin.sendMessage(from, { react: { text: "❌", key: msg.key } });
-          reply(`⚠️ Download karte samay truti aayi: ${error.message}`);
-        }
-      });
+        // Listener ko start karein
+        robin.ev.on("messages.upsert", handler);
+
+        // 2 minute baad listener khud band ho jaye agar user reply na kare
+        setTimeout(() => {
+            robin.ev.off("messages.upsert", handler);
+        }, 120000);
+
     } catch (e) {
-      console.error("Command error:", e);
-      await robin.sendMessage(from, { react: { text: "❌", key: mek.key } });
-      reply(`⚠️ *Error:* ${e.message || "Anjaan truti hui"}`);
+        reply(`⚠️ Error: ${e.message}`);
     }
-  }
-);
-                                     
+});
+  
