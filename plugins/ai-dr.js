@@ -4,8 +4,8 @@ const { cmd } = require("../command"); // Assuming command.js is in the lib fold
 // --- API Configuration ---
 // These tokens are used to authenticate with the external reaction service.
 const tokens = [
-  "movanest-keyZGKACPJ3VO", 
-  "Movanest-keyZ"
+  "movanest-keyARCH6LACUC", 
+  "movanest-keyTLZTYRQXML"
 ];
 
 const DELAY_ON_LIMIT = 5000; // Delay in milliseconds (5 seconds) when an API limit is hit
