@@ -1,10 +1,11 @@
-const axios = require("axios");
-const yts = require("yt-search");
-const config = require("../config");
-const { cmd } = require("../command");
+const config = require('../config');
+const { cmd } = require('../command');
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 
-cmd({
-  pattern: "play2",
+// MP4 video download
+
+cmd({ 
+  pattern: "play",
   alias: ["play3", "play4", "sania"],   
   desc: "Download YouTube audio by title",
   category: "download",
@@ -45,4 +46,4 @@ cmd({
 });
 
 
-      
+    
